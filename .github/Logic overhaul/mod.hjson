@@ -1,0 +1,6 @@
+name: Logic Overhaul
+displayName: Logic Overhaul
+author: g3th
+description: Adds enhanced logic controls and a text-based logic editor.
+version: 1.0
+minGameVersion: 160
