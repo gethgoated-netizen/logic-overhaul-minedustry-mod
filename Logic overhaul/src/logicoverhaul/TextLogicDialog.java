@@ -17,7 +17,7 @@ import arc.struct.Seq;
 import arc.util.Align;
 
 import mindustry.Vars;
-import mindustry.graphics.Fonts;
+import mindustry.ui.Fonts;
 import mindustry.logic.LAssembler;
 import mindustry.logic.LStatement;
 import mindustry.logic.LStatements.InvalidStatement;
