@@ -965,11 +965,8 @@ public class ScriptLibraryDialog extends BaseDialog {
     // OPEN LIBRARY
     // ================================================
 
-    @Override
-    public void show() {
-
-        refresh();
-
-        super.show();
-    }
+   @Override
+public arc.scene.ui.Dialog show() {
+    refresh();
+    return super.show();
 }
