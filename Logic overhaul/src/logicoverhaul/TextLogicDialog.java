@@ -1,3 +1,4 @@
+
 package logicoverhaul;
 
 import arc.func.Cons;
@@ -39,6 +40,7 @@ public class TextLogicDialog extends BaseDialog {
     private Label status;
 
     private Table editorRows;
+    private Table autocomplete;
     private ScrollPane editorScroll;
 
     private final Set<Integer> errorLines = new HashSet<>();
@@ -69,6 +71,116 @@ public class TextLogicDialog extends BaseDialog {
 
     private static final Color ERROR =
         Color.valueOf("FF5555");
+
+    // MINDUSTRY LOGIC COMMANDS
+    private static final String[] LOGIC_COMMANDS = {
+        "set",
+        "op",
+        "jump",
+        "sensor",
+        "control",
+        "radar",
+        "uradar",
+        "ucontrol",
+        "ulocate",
+        "getlink",
+        "read",
+        "write",
+        "print",
+        "printflush",
+        "draw",
+        "drawflush",
+        "lookup",
+        "fetch",
+        "wait",
+        "end",
+        "stop",
+        "ubind",
+        "setrate",
+        "packcolor",
+        "unpackcolor"
+    };
+
+    // BUILT-IN VARIABLES
+    private static final String[] LOGIC_VARIABLES = {
+        "@unit",
+        "@this",
+        "@health",
+        "@maxHealth",
+        "@x",
+        "@y",
+        "@dead",
+        "@time",
+        "@tick",
+        "@second",
+        "@minute",
+        "@wave",
+        "@waveTime",
+        "@mapw",
+        "@maph",
+        "@links",
+        "@counter",
+        "@team",
+        "@copper",
+        "@lead",
+        "@graph",
+        "@power",
+        "@enabled",
+        "@rotation",
+        "@shooting",
+        "@ammo",
+        "@type",
+        "@name",
+        "@flag",
+        "@totalItems",
+        "@firstItem",
+        "@itemCapacity",
+        "@powerNetStored",
+        "@powerNetCapacity"
+    };
+
+    // LOGIC OPERATIONS
+    private static final String[] LOGIC_OPERATIONS = {
+        "add",
+        "sub",
+        "mul",
+        "div",
+        "idiv",
+        "mod",
+        "pow",
+        "equal",
+        "notEqual",
+        "land",
+        "lessThan",
+        "lessThanEq",
+        "greaterThan",
+        "greaterThanEq",
+        "strictEqual",
+        "shl",
+        "shr",
+        "or",
+        "and",
+        "xor",
+        "max",
+        "min",
+        "angle",
+        "angleDiff",
+        "len",
+        "noise",
+        "abs",
+        "log",
+        "logn",
+        "floor",
+        "ceil",
+        "sqrt",
+        "rand",
+        "sin",
+        "cos",
+        "tan",
+        "asin",
+        "acos",
+        "atan"
+    };
 
     public TextLogicDialog() {
         super("Logic Overhaul - Text Editor");
@@ -178,6 +290,16 @@ public class TextLogicDialog extends BaseDialog {
             .minSize(500f, 300f)
             .row();
 
+        // AUTOCOMPLETE BAR
+        autocomplete = new Table(Styles.grayPanelDark);
+        autocomplete.left();
+
+        cont.add(autocomplete)
+            .growX()
+            .minHeight(38f)
+            .maxHeight(44f)
+            .row();
+
         // TERMINAL
         Table terminal = new Table(
             Styles.grayPanelDark
@@ -225,7 +347,7 @@ public class TextLogicDialog extends BaseDialog {
             .maxHeight(110f)
             .row();
 
-        // LIVE VALIDATION
+        // LIVE VALIDATION AND AUTOCOMPLETE
         codeArea.addListener(new ChangeListener() {
             @Override
             public void changed(
@@ -259,6 +381,8 @@ public class TextLogicDialog extends BaseDialog {
         );
 
         buttons.button("Cancel", this::hide);
+
+        updateAutocomplete();
     }
 
     // UPDATE EDITOR INFORMATION
@@ -301,6 +425,279 @@ public class TextLogicDialog extends BaseDialog {
 
         editorRows.invalidateHierarchy();
         editorScroll.invalidateHierarchy();
+
+        updateAutocomplete();
+    }
+
+    // AUTOCOMPLETE
+    private void updateAutocomplete() {
+
+        if (autocomplete == null || codeArea == null) {
+            return;
+        }
+
+        autocomplete.clear();
+
+        String source = codeArea.getText();
+
+        int cursor = codeArea.getCursorPosition();
+
+        if (cursor < 0 || cursor > source.length()) {
+            return;
+        }
+
+        // Find the beginning of the current word.
+        int tokenStart = cursor;
+
+        while (tokenStart > 0) {
+
+            char c = source.charAt(tokenStart - 1);
+
+            if (
+                Character.isWhitespace(c) ||
+                c == ';' ||
+                c == ','
+            ) {
+                break;
+            }
+
+            tokenStart--;
+        }
+
+        String prefix = source.substring(
+            tokenStart,
+            cursor
+        );
+
+        if (prefix.isEmpty()) {
+
+            Label hint = new Label(
+                "TYPE TO SEE SUGGESTIONS",
+                Styles.monoLabel
+            );
+
+            hint.setColor(DIM_GREEN);
+
+            autocomplete.add(hint)
+                .left()
+                .pad(5f);
+
+            return;
+        }
+
+        // Find the current instruction.
+        int lineStart = source.lastIndexOf(
+            '\n',
+            Math.max(0, tokenStart - 1)
+        ) + 1;
+
+        String beforeToken = source.substring(
+            lineStart,
+            tokenStart
+        );
+
+        int semicolon = beforeToken.lastIndexOf(';');
+
+        if (semicolon >= 0) {
+            beforeToken = beforeToken.substring(
+                semicolon + 1
+            );
+        }
+
+        boolean commandPosition =
+            beforeToken.trim().isEmpty();
+
+        ArrayList<String> suggestions =
+            new ArrayList<>();
+
+        if (commandPosition) {
+
+            addMatching(
+                suggestions,
+                LOGIC_COMMANDS,
+                prefix
+            );
+
+        } else {
+
+            // Suggest built-in variables.
+            addMatching(
+                suggestions,
+                LOGIC_VARIABLES,
+                prefix
+            );
+
+            // Suggest operation names.
+            addMatching(
+                suggestions,
+                LOGIC_OPERATIONS,
+                prefix
+            );
+
+            // Suggest common logic values.
+            addMatching(
+                suggestions,
+                new String[]{
+                    "true",
+                    "false",
+                    "null",
+                    "always",
+                    "equal",
+                    "notEqual",
+                    "lessThan",
+                    "greaterThan",
+                    "lessThanEq",
+                    "greaterThanEq"
+                },
+                prefix
+            );
+
+            // Suggest variables declared in the script.
+            addDeclaredVariables(
+                suggestions,
+                source,
+                prefix
+            );
+        }
+
+        if (suggestions.isEmpty()) {
+
+            Label hint = new Label(
+                "NO MATCHING SUGGESTIONS",
+                Styles.monoLabel
+            );
+
+            hint.setColor(DIM_GREEN);
+
+            autocomplete.add(hint)
+                .left()
+                .pad(5f);
+
+            return;
+        }
+
+        int shown = Math.min(5, suggestions.size());
+
+        for (int i = 0; i < shown; i++) {
+
+            final String suggestion = suggestions.get(i);
+
+            final int insertAt = tokenStart;
+            final int insertEnd = cursor;
+
+            autocomplete.button(
+                suggestion,
+                () -> insertAutocomplete(
+                    suggestion,
+                    insertAt,
+                    insertEnd
+                )
+            ).size(100f, 32f);
+        }
+    }
+
+    // ADD MATCHING SUGGESTIONS
+    private void addMatching(
+        ArrayList<String> output,
+        String[] choices,
+        String prefix
+    ) {
+
+        for (String choice : choices) {
+
+            if (
+                choice.toLowerCase().startsWith(
+                    prefix.toLowerCase()
+                ) &&
+                !output.contains(choice)
+            ) {
+                output.add(choice);
+            }
+        }
+    }
+
+    // FIND VARIABLES DECLARED IN THE SCRIPT
+    private void addDeclaredVariables(
+        ArrayList<String> output,
+        String source,
+        String prefix
+    ) {
+
+        String[] lines = source.split("\n");
+
+        for (String line : lines) {
+
+            String trimmed = line.trim();
+
+            if (
+                trimmed.startsWith("#") ||
+                trimmed.isEmpty()
+            ) {
+                continue;
+            }
+
+            String[] parts = trimmed.split("\\s+");
+
+            if (parts.length < 2) {
+                continue;
+            }
+
+            String command = parts[0];
+
+            if (
+                command.equals("set") ||
+                command.equals("op") ||
+                command.equals("sensor") ||
+                command.equals("read") ||
+                command.equals("getlink") ||
+                command.equals("lookup") ||
+                command.equals("fetch") ||
+                command.equals("getflag")
+            ) {
+
+                String variable = parts[1];
+
+                if (
+                    variable.toLowerCase().startsWith(
+                        prefix.toLowerCase()
+                    ) &&
+                    !output.contains(variable)
+                ) {
+                    output.add(variable);
+                }
+            }
+        }
+    }
+
+    // INSERT SELECTED AUTOCOMPLETE ITEM
+    private void insertAutocomplete(
+        String suggestion,
+        int start,
+        int end
+    ) {
+
+        String source = codeArea.getText();
+
+        if (
+            start < 0 ||
+            end > source.length() ||
+            start > end
+        ) {
+            return;
+        }
+
+        String updated =
+            source.substring(0, start)
+            + suggestion
+            + source.substring(end);
+
+        codeArea.setText(updated);
+
+        codeArea.setCursorPosition(
+            start + suggestion.length()
+        );
+
+        refreshEditor();
     }
 
     // CHECK CODE USING MINDUSTRY'S LOGIC PARSER
@@ -348,6 +745,7 @@ public class TextLogicDialog extends BaseDialog {
                 }
 
                 if (invalid) {
+
                     errorLines.add(i + 1);
                     errorCount++;
 
@@ -369,8 +767,8 @@ public class TextLogicDialog extends BaseDialog {
             }
         }
 
-        // Check the complete script for errors
-        // such as missing jump labels.
+        // Check the complete script for errors,
+        // including unresolved jump labels.
         try {
 
             LAssembler.assemble(source, false);
@@ -379,11 +777,15 @@ public class TextLogicDialog extends BaseDialog {
 
             String message = errorMessage(error);
 
-            messages.add(
-                "Script: " + message
-            );
+            // Avoid adding the exact same error twice.
+            if (!messages.contains("Script: " + message)) {
 
-            errorCount++;
+                messages.add(
+                    "Script: " + message
+                );
+
+                errorCount++;
+            }
         }
 
         if (errorCount == 0) {
@@ -504,7 +906,7 @@ public class TextLogicDialog extends BaseDialog {
                     physicalLine
                 );
 
-                // Draw a red underline on invalid lines.
+                // Red underline on invalid lines.
                 if (errorLines.contains(physicalLine)) {
 
                     float width =
@@ -546,14 +948,12 @@ public class TextLogicDialog extends BaseDialog {
 
                 char c = text.charAt(pos);
 
-                // Ignore spaces; glyph positions
-                // preserve their original spacing.
                 if (Character.isWhitespace(c)) {
                     pos++;
                     continue;
                 }
 
-                // Comments
+                // COMMENTS
                 if (c == '#') {
 
                     drawRange(
@@ -564,7 +964,7 @@ public class TextLogicDialog extends BaseDialog {
                     break;
                 }
 
-                // Strings
+                // STRINGS
                 if (c == '"') {
 
                     int tokenEnd = pos + 1;
@@ -599,7 +999,7 @@ public class TextLogicDialog extends BaseDialog {
                     continue;
                 }
 
-                // Semicolon begins another instruction.
+                // SEMICOLON
                 if (c == ';') {
 
                     drawRange(
@@ -688,7 +1088,7 @@ public class TextLogicDialog extends BaseDialog {
                 Double.parseDouble(token);
                 return true;
             } catch (NumberFormatException ignored) {
-                // Continue checking other number formats.
+                // Check other number formats.
             }
 
             return token.matches(
