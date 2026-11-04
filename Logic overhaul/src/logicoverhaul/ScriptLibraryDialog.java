@@ -4,10 +4,14 @@ import arc.Core;
 import arc.files.Fi;
 import arc.func.Cons;
 import arc.func.Prov;
+import arc.scene.ui.Label;
+import arc.scene.ui.ScrollPane;
 import arc.scene.ui.TextArea;
 import arc.scene.ui.TextField;
 import arc.scene.ui.layout.Table;
+
 import mindustry.Vars;
+import mindustry.ui.Styles;
 import mindustry.ui.dialogs.BaseDialog;
 
 import java.io.StringReader;
@@ -22,7 +26,8 @@ import java.util.Properties;
 
 public class ScriptLibraryDialog extends BaseDialog {
 
-    private static final String PACKAGE_HEADER = "LOGIC_OVERHAUL_SCRIPT_V1";
+    private static final String PACKAGE_HEADER =
+        "LOGIC_OVERHAUL_SCRIPT_V1";
 
     private final Fi directory;
 
@@ -52,40 +57,55 @@ public class ScriptLibraryDialog extends BaseDialog {
         buildInterface();
     }
 
-    // --------------------------------------------------
-    // MAIN LIBRARY WINDOW
-    // --------------------------------------------------
+    // ================================================
+    // MAIN LIBRARY
+    // ================================================
 
     private void buildInterface() {
+
         cont.clear();
 
-        cont.add("Your saved scripts").left();
-        cont.row();
-
-        cont.add("Scripts are stored locally on this device.")
+        cont.add("LOGIC OVERHAUL SCRIPT LIBRARY")
             .left()
-            .padBottom(10f);
+            .pad(8f)
+            .row();
 
-        cont.row();
+        cont.add(
+            "Scripts are stored locally on this device."
+        )
+        .left()
+        .padBottom(10f)
+        .row();
 
-        cont.pane(scriptList)
-            .width(720f)
-            .height(390f)
-            .growX();
+        ScrollPane scroll = new ScrollPane(
+            scriptList,
+            Styles.noBarPane
+        );
 
-        cont.row();
+        scroll.setFadeScrollBars(false);
 
-        cont.button("Save Current Script", this::saveCurrent)
-            .width(210f)
-            .height(48f);
+        cont.add(scroll)
+            .grow()
+            .minSize(600f, 320f)
+            .row();
 
-        cont.button("Import Script", this::showImport)
-            .width(170f)
-            .height(48f);
+        cont.button(
+            "Save Current Script",
+            this::saveCurrent
+        )
+        .size(190f, 48f);
 
-        cont.button("Refresh", this::refresh)
-            .width(120f)
-            .height(48f);
+        cont.button(
+            "Import Script",
+            this::showImport
+        )
+        .size(150f, 48f);
+
+        cont.button(
+            "Refresh",
+            this::refresh
+        )
+        .size(120f, 48f);
 
         buttons.button("Close", this::hide);
 
@@ -93,21 +113,21 @@ public class ScriptLibraryDialog extends BaseDialog {
     }
 
     private void saveCurrent() {
+
         String source = getCurrentCode.get();
 
-        if (source == null) {
-            source = "";
-        }
-
-        showSaveDialog(source);
+        showSaveDialog(
+            source == null ? "" : source
+        );
     }
 
-    // --------------------------------------------------
+    // ================================================
     // SAVE DIALOG
-    // --------------------------------------------------
+    // ================================================
 
     public void showSaveDialog(String source) {
-        BaseDialog saveDialog = new BaseDialog("Save Script");
+
+        BaseDialog dialog = new BaseDialog("Save Script");
 
         TextField name = new TextField("");
         TextField category = new TextField("My Scripts");
@@ -115,49 +135,53 @@ public class ScriptLibraryDialog extends BaseDialog {
 
         String author = getCurrentAuthor();
 
-        saveDialog.cont.add("Script Name").left();
-        saveDialog.cont.row();
+        dialog.cont.add("Script Name")
+            .left()
+            .row();
 
-        saveDialog.cont.add(name)
-            .width(430f)
-            .left();
+        dialog.cont.add(name)
+            .width(450f)
+            .row();
 
-        saveDialog.cont.row();
+        dialog.cont.add("Category")
+            .left()
+            .row();
 
-        saveDialog.cont.add("Category").left();
-        saveDialog.cont.row();
+        dialog.cont.add(category)
+            .width(450f)
+            .row();
 
-        saveDialog.cont.add(category)
-            .width(430f)
-            .left();
+        dialog.cont.add("Author: " + author)
+            .left()
+            .padTop(8f)
+            .row();
 
-        saveDialog.cont.row();
+        dialog.cont.add("Your Description")
+            .left()
+            .padTop(8f)
+            .row();
 
-        saveDialog.cont.add("Author: " + author)
-            .left();
-
-        saveDialog.cont.row();
-
-        saveDialog.cont.add("Your Description").left();
-        saveDialog.cont.row();
-
-        saveDialog.cont.add(description)
-            .width(430f)
+        dialog.cont.add(description)
+            .width(450f)
             .height(120f)
-            .left();
+            .row();
 
-        saveDialog.cont.row();
+        dialog.cont.add(
+            "Write your own explanation of what the script does."
+        )
+        .left()
+        .row();
 
-        saveDialog.cont.add(
-            "Write your own explanation of what this script does."
-        ).left();
+        dialog.buttons.button("Save", () -> {
 
-        saveDialog.buttons.button("Save", () -> {
             String scriptName = cleanName(name.getText());
             String scriptCategory = cleanName(category.getText());
 
             if (scriptName.isEmpty()) {
-                Vars.ui.showInfoToast("Enter a script name.", 2f);
+                Vars.ui.showInfoToast(
+                    "Enter a script name.",
+                    2f
+                );
                 return;
             }
 
@@ -173,29 +197,21 @@ public class ScriptLibraryDialog extends BaseDialog {
             data.description = description.getText();
             data.code = source == null ? "" : source;
 
-            saveScript(data);
-            saveDialog.hide();
+            saveScript(data, () -> dialog.hide());
         });
 
-        saveDialog.buttons.button("Cancel", saveDialog::hide);
+        dialog.buttons.button("Cancel", dialog::hide);
 
-        saveDialog.show();
+        dialog.show();
     }
 
-    // --------------------------------------------------
-    // PLAYER AUTHOR
-    // --------------------------------------------------
+    // ================================================
+    // AUTOMATIC AUTHOR
+    // ================================================
 
     private String getCurrentAuthor() {
-        String author = "";
 
-        if (Vars.player != null && Vars.player.name != null) {
-            author = Vars.player.name;
-        }
-
-        if (author.trim().isEmpty()) {
-            author = Core.settings.getString("name");
-        }
+        String author = Core.settings.getString("name", "");
 
         if (author == null || author.trim().isEmpty()) {
             return "Anonymous User";
@@ -204,77 +220,135 @@ public class ScriptLibraryDialog extends BaseDialog {
         return author.trim();
     }
 
-    // --------------------------------------------------
-    // SAVE SCRIPT FILES
-    // --------------------------------------------------
+    // ================================================
+    // SAVE SCRIPT
+    // ================================================
 
-    private void saveScript(ScriptData data) {
-        Fi folder = directory.child(cleanName(data.category));
+    private void saveScript(
+        ScriptData data,
+        Runnable afterSave
+    ) {
+
+        data.name = cleanName(data.name);
+        data.category = cleanName(data.category);
+
+        if (data.name.isEmpty()) {
+            Vars.ui.showInfoToast(
+                "Invalid script name.",
+                2f
+            );
+            return;
+        }
+
+        if (data.category.isEmpty()) {
+            data.category = "My Scripts";
+        }
+
+        Fi folder = directory.child(data.category);
         folder.mkdirs();
 
-        Fi file = folder.child(cleanName(data.name) + ".mlog");
+        data.file = folder.child(data.name + ".mlog");
 
-        data.file = file;
+        if (data.file.exists()) {
 
-        if (file.exists()) {
-            BaseDialog confirm = new BaseDialog("Overwrite Script?");
+            BaseDialog confirm =
+                new BaseDialog("Overwrite Script?");
 
             confirm.cont.add(
-                "A script with this name already exists in this category."
+                "A script with this name already exists."
             );
 
             confirm.buttons.button("Overwrite", () -> {
-                writeScript(data);
-                confirm.hide();
-                refresh();
+
+                if (writeScript(data)) {
+                    confirm.hide();
+                    refresh();
+
+                    if (afterSave != null) {
+                        afterSave.run();
+                    }
+                }
+
             });
 
             confirm.buttons.button("Cancel", confirm::hide);
 
             confirm.show();
+
             return;
         }
 
-        writeScript(data);
-        refresh();
-    }
+        if (writeScript(data)) {
 
-    private void writeScript(ScriptData data) {
-        try {
-            data.file.writeString(data.code == null ? "" : data.code);
+            refresh();
 
-            writeMetadata(data);
-
-            Vars.ui.showInfoToast("Script saved.", 2f);
-        } catch (Throwable error) {
-            Vars.ui.showException(error);
+            if (afterSave != null) {
+                afterSave.run();
+            }
         }
     }
 
-    // --------------------------------------------------
-    // SCRIPT METADATA
-    // --------------------------------------------------
+    private boolean writeScript(ScriptData data) {
+
+        try {
+
+            data.file.writeString(
+                data.code == null ? "" : data.code
+            );
+
+            writeMetadata(data);
+
+            Vars.ui.showInfoToast(
+                "Script saved successfully.",
+                2f
+            );
+
+            return true;
+
+        } catch (Throwable error) {
+
+            Vars.ui.showException(error);
+            return false;
+        }
+    }
+
+    // ================================================
+    // SAVE SCRIPT INFORMATION
+    // ================================================
 
     private void writeMetadata(ScriptData data) {
+
         try {
+
             Properties properties = new Properties();
 
             properties.setProperty("name", data.name);
             properties.setProperty("category", data.category);
             properties.setProperty("author", data.author);
-            properties.setProperty("description", data.description);
+            properties.setProperty(
+                "description",
+                data.description == null ? "" : data.description
+            );
 
             StringWriter writer = new StringWriter();
-            properties.store(writer, "Logic Overhaul Script Information");
 
-            Fi metadataFile = getMetadataFile(data.file);
-            metadataFile.writeString(writer.toString());
+            properties.store(
+                writer,
+                "Logic Overhaul Script Information"
+            );
+
+            getMetadataFile(data.file).writeString(
+                writer.toString()
+            );
+
         } catch (Throwable error) {
+
             Vars.ui.showException(error);
         }
     }
 
     private ScriptData readScript(Fi file) {
+
         ScriptData data = new ScriptData();
 
         data.file = file;
@@ -285,38 +359,61 @@ public class ScriptLibraryDialog extends BaseDialog {
         data.author = "Anonymous User";
         data.description = "";
 
-        Fi metadataFile = getMetadataFile(file);
+        Fi metadata = getMetadataFile(file);
 
-        if (!metadataFile.exists()) {
+        if (!metadata.exists()) {
             return data;
         }
 
         try {
-            Properties properties = new Properties();
-            properties.load(new StringReader(metadataFile.readString()));
 
-            data.name = properties.getProperty("name", data.name);
-            data.category = properties.getProperty("category", data.category);
-            data.author = properties.getProperty("author", data.author);
-            data.description = properties.getProperty("description", "");
+            Properties properties = new Properties();
+
+            properties.load(
+                new StringReader(metadata.readString())
+            );
+
+            data.name = properties.getProperty(
+                "name",
+                data.name
+            );
+
+            data.category = properties.getProperty(
+                "category",
+                data.category
+            );
+
+            data.author = properties.getProperty(
+                "author",
+                data.author
+            );
+
+            data.description = properties.getProperty(
+                "description",
+                ""
+            );
+
         } catch (Throwable ignored) {
-            // Older or damaged metadata will not prevent loading the script.
+
+            // Older scripts without metadata still load.
         }
 
         return data;
     }
 
-    private Fi getMetadataFile(Fi scriptFile) {
-        return scriptFile.parent().child(
-            scriptFile.nameWithoutExtension() + ".meta"
+    private Fi getMetadataFile(Fi file) {
+
+        return file.parent().child(
+            file.nameWithoutExtension() + ".meta"
         );
     }
 
-    // --------------------------------------------------
-    // LIST SAVED SCRIPTS
-    // --------------------------------------------------
+    // ================================================
+    // REFRESH SCRIPT LIST
+    // ================================================
 
     private void refresh() {
+
         scriptList.clear();
 
         directory.mkdirs();
@@ -325,13 +422,17 @@ public class ScriptLibraryDialog extends BaseDialog {
 
         findScripts(directory, files);
 
-        Collections.sort(files, Comparator.comparing(
-            Fi::name,
-            String.CASE_INSENSITIVE_ORDER
-        ));
+        Collections.sort(
+            files,
+            Comparator.comparing(
+                Fi::name,
+                String.CASE_INSENSITIVE_ORDER
+            )
+        );
 
         if (files.isEmpty()) {
-            scriptList.add("No scripts saved yet.")
+
+            scriptList.add("No saved scripts yet.")
                 .left()
                 .pad(12f);
 
@@ -339,30 +440,40 @@ public class ScriptLibraryDialog extends BaseDialog {
         }
 
         for (Fi file : files) {
+
             ScriptData data = readScript(file);
 
             scriptList.table(row -> {
+
                 row.add(data.name)
-                    .width(180f)
+                    .width(150f)
                     .left();
 
                 row.add(data.category)
-                    .width(110f)
+                    .width(100f)
                     .left();
 
                 row.add("By " + data.author)
-                    .width(170f)
+                    .width(160f)
                     .left();
 
-                row.button("Open", () -> showPreview(data))
-                    .width(75f);
+                row.button(
+                    "Open",
+                    () -> showPreview(data)
+                )
+                .width(65f);
 
-                row.button("Delete", () -> confirmDelete(file, null))
-                    .width(75f);
+                row.button(
+                    "Delete",
+                    () -> confirmDelete(file)
+                )
+                .width(65f);
 
                 row.row();
 
-                String description = data.description.trim().isEmpty()
+                String description =
+                    data.description == null ||
+                    data.description.trim().isEmpty()
                     ? "No description provided."
                     : data.description;
 
@@ -370,46 +481,64 @@ public class ScriptLibraryDialog extends BaseDialog {
                     .colspan(5)
                     .growX()
                     .left()
-                    .padBottom(10f);
+                    .padBottom(12f);
+
             }).growX();
 
             scriptList.row();
         }
     }
 
-    private void findScripts(Fi folder, List<Fi> result) {
+    private void findScripts(
+        Fi folder,
+        List<Fi> result
+    ) {
+
         for (Fi file : folder.list()) {
+
             if (file.isDirectory()) {
+
                 findScripts(file, result);
-            } else if (file.extension().equalsIgnoreCase("mlog")) {
+
+            } else if (
+                file.extension().equalsIgnoreCase("mlog")
+            ) {
+
                 result.add(file);
             }
         }
     }
 
-    // --------------------------------------------------
+    // ================================================
     // SCRIPT PREVIEW
-    // --------------------------------------------------
+    // ================================================
 
     private void showPreview(ScriptData data) {
+
         BaseDialog preview = new BaseDialog(data.name);
 
-        preview.cont.add("Category: " + data.category).left();
-        preview.cont.row();
+        preview.cont.add("Category: " + data.category)
+            .left()
+            .row();
 
-        preview.cont.add("Author: " + data.author).left();
-        preview.cont.row();
+        preview.cont.add("Author: " + data.author)
+            .left()
+            .row();
 
-        preview.cont.add("Description").left();
-        preview.cont.row();
+        preview.cont.add("Description")
+            .left()
+            .padTop(8f)
+            .row();
 
         preview.cont.add(
             data.description.trim().isEmpty()
                 ? "No description provided."
                 : data.description
-        ).width(580f).left();
-
-        preview.cont.row();
+        )
+        .width(580f)
+        .left()
+        .padBottom(8f)
+        .row();
 
         TextArea code = new TextArea(data.code);
 
@@ -417,53 +546,71 @@ public class ScriptLibraryDialog extends BaseDialog {
             .width(580f)
             .height(300f);
 
-        preview.buttons.button("Replace Editor", () -> {
-            replaceCode.get(data.code);
-            preview.hide();
-            hide();
-        });
+        preview.buttons.button(
+            "Replace Editor",
+            () -> {
 
-        preview.buttons.button("Insert at Cursor", () -> {
-            insertCode.get(data.code);
-            preview.hide();
-            hide();
-        });
+                replaceCode.get(data.code);
 
-        preview.buttons.button("Edit Description", () -> {
-            showEditDescription(data, preview);
-        });
+                preview.hide();
+                hide();
+            }
+        );
 
-        preview.buttons.button("Export", () -> {
-            showExport(data);
-        });
+        preview.buttons.button(
+            "Insert at Cursor",
+            () -> {
 
-        preview.buttons.button("Close", preview::hide);
+                insertCode.get(data.code);
+
+                preview.hide();
+                hide();
+            }
+        );
+
+        preview.buttons.button(
+            "Edit Description",
+            () -> showEditDescription(data, preview)
+        );
+
+        preview.buttons.button(
+            "Export",
+            () -> showExport(data)
+        );
+
+        preview.buttons.button(
+            "Close",
+            preview::hide
+        );
 
         preview.show();
     }
 
-    // --------------------------------------------------
+    // ================================================
     // EDIT DESCRIPTION
-    // --------------------------------------------------
+    // ================================================
 
     private void showEditDescription(
         ScriptData data,
         BaseDialog oldPreview
     ) {
-        BaseDialog edit = new BaseDialog("Edit Script Description");
 
-        TextArea description = new TextArea(data.description);
+        BaseDialog edit =
+            new BaseDialog("Edit Script Description");
 
-        edit.cont.add("Edit your description below.")
-            .left();
+        TextArea description =
+            new TextArea(data.description);
 
-        edit.cont.row();
+        edit.cont.add("Write your new description.")
+            .left()
+            .row();
 
         edit.cont.add(description)
             .width(500f)
-            .height(180f);
+            .height(160f);
 
         edit.buttons.button("Save", () -> {
+
             data.description = description.getText();
 
             writeMetadata(data);
@@ -472,6 +619,7 @@ public class ScriptLibraryDialog extends BaseDialog {
             oldPreview.hide();
 
             refresh();
+
             showPreview(readScript(data.file));
         });
 
@@ -480,28 +628,26 @@ public class ScriptLibraryDialog extends BaseDialog {
         edit.show();
     }
 
-    // --------------------------------------------------
+    // ================================================
     // DELETE SCRIPT
-    // --------------------------------------------------
+    // ================================================
 
-    private void confirmDelete(Fi file, BaseDialog preview) {
-        BaseDialog confirm = new BaseDialog("Delete Script?");
+    private void confirmDelete(Fi file) {
+
+        BaseDialog confirm =
+            new BaseDialog("Delete Script?");
 
         confirm.cont.add(
-            "Are you sure you want to delete "
-                + file.nameWithoutExtension()
-                + "?"
+            "Are you sure you want to delete " +
+            file.nameWithoutExtension() + "?"
         );
 
         confirm.buttons.button("Delete", () -> {
+
             file.delete();
             getMetadataFile(file).delete();
 
             confirm.hide();
-
-            if (preview != null) {
-                preview.hide();
-            }
 
             refresh();
         });
@@ -511,20 +657,23 @@ public class ScriptLibraryDialog extends BaseDialog {
         confirm.show();
     }
 
-    // --------------------------------------------------
+    // ================================================
     // EXPORT SCRIPT
-    // --------------------------------------------------
+    // ================================================
 
     private void showExport(ScriptData data) {
-        BaseDialog export = new BaseDialog("Export Script");
 
-        TextArea packageText = new TextArea(createPackage(data));
+        BaseDialog export =
+            new BaseDialog("Export Script");
+
+        TextArea packageText =
+            new TextArea(createPackage(data));
 
         export.cont.add(
-            "Copy this exported text to share the script."
-        ).left();
-
-        export.cont.row();
+            "Copy this complete package to share your script."
+        )
+        .left()
+        .row();
 
         export.cont.add(packageText)
             .width(600f)
@@ -536,24 +685,41 @@ public class ScriptLibraryDialog extends BaseDialog {
     }
 
     private String createPackage(ScriptData data) {
+
         StringBuilder result = new StringBuilder();
 
         result.append(PACKAGE_HEADER).append("\n");
-        result.append("name=").append(encode(data.name)).append("\n");
-        result.append("category=").append(encode(data.category)).append("\n");
-        result.append("author=").append(encode(data.author)).append("\n");
-        result.append("description=").append(encode(data.description)).append("\n");
-        result.append("code=").append(encode(data.code));
+
+        result.append("name=")
+            .append(encode(data.name))
+            .append("\n");
+
+        result.append("category=")
+            .append(encode(data.category))
+            .append("\n");
+
+        result.append("author=")
+            .append(encode(data.author))
+            .append("\n");
+
+        result.append("description=")
+            .append(encode(data.description))
+            .append("\n");
+
+        result.append("code=")
+            .append(encode(data.code));
 
         return result.toString();
     }
 
-    // --------------------------------------------------
+    // ================================================
     // IMPORT SCRIPT
-    // --------------------------------------------------
+    // ================================================
 
     private void showImport() {
-        BaseDialog importDialog = new BaseDialog("Import Script");
+
+        BaseDialog dialog =
+            new BaseDialog("Import Script");
 
         TextField name = new TextField("");
         TextField category = new TextField("My Scripts");
@@ -562,68 +728,82 @@ public class ScriptLibraryDialog extends BaseDialog {
         TextArea description = new TextArea("");
         TextArea code = new TextArea("");
 
-        importDialog.cont.add("Script Name").left();
-        importDialog.cont.row();
+        dialog.cont.add("Script Name")
+            .left()
+            .row();
 
-        importDialog.cont.add(name)
-            .width(480f);
-
-        importDialog.cont.row();
-
-        importDialog.cont.add("Category").left();
-        importDialog.cont.row();
-
-        importDialog.cont.add(category)
-            .width(480f);
-
-        importDialog.cont.row();
-
-        importDialog.cont.add("Original Author").left();
-        importDialog.cont.row();
-
-        importDialog.cont.add(author)
-            .width(480f);
-
-        importDialog.cont.row();
-
-        importDialog.cont.add("Description").left();
-        importDialog.cont.row();
-
-        importDialog.cont.add(description)
+        dialog.cont.add(name)
             .width(480f)
-            .height(90f);
+            .row();
 
-        importDialog.cont.row();
+        dialog.cont.add("Category")
+            .left()
+            .row();
 
-        importDialog.cont.add(
-            "Paste an exported package or raw .mlog code."
-        ).left();
+        dialog.cont.add(category)
+            .width(480f)
+            .row();
 
-        importDialog.cont.row();
+        dialog.cont.add("Original Author")
+            .left()
+            .row();
 
-        importDialog.cont.add(code)
+        dialog.cont.add(author)
+            .width(480f)
+            .row();
+
+        dialog.cont.add("Description")
+            .left()
+            .row();
+
+        dialog.cont.add(description)
+            .width(480f)
+            .height(90f)
+            .row();
+
+        dialog.cont.add(
+            "Paste an exported package or raw Mindustry logic."
+        )
+        .left()
+        .row();
+
+        dialog.cont.add(code)
             .width(600f)
             .height(230f);
 
-        importDialog.buttons.button("Import", () -> {
+        dialog.buttons.button("Import", () -> {
+
             String pasted = code.getText();
 
             if (pasted.trim().isEmpty()) {
-                Vars.ui.showInfoToast("Paste a script first.", 2f);
+
+                Vars.ui.showInfoToast(
+                    "Paste a script first.",
+                    2f
+                );
+
                 return;
             }
 
             ScriptData data;
 
             try {
+
                 data = parsePackage(pasted);
+
             } catch (Throwable error) {
-                Vars.ui.showInfoToast("Could not read that script package.", 3f);
+
+                Vars.ui.showInfoToast(
+                    "Invalid script package.",
+                    3f
+                );
+
                 return;
             }
 
+            // Raw .mlog code: use the information entered.
             if (data == null) {
-                // Plain .mlog code: use the information entered above.
+
                 data = new ScriptData();
 
                 data.name = cleanName(name.getText());
@@ -633,7 +813,12 @@ public class ScriptLibraryDialog extends BaseDialog {
                 data.code = pasted;
 
                 if (data.name.isEmpty()) {
-                    Vars.ui.showInfoToast("Enter a script name.", 2f);
+
+                    Vars.ui.showInfoToast(
+                        "Enter a script name.",
+                        2f
+                    );
+
                     return;
                 }
 
@@ -646,70 +831,88 @@ public class ScriptLibraryDialog extends BaseDialog {
                 }
             }
 
-            if (data.name == null || data.name.trim().isEmpty()) {
-                Vars.ui.showInfoToast("The script has no name.", 2f);
+            // Keep original package author information.
+            if (
+                data.name == null ||
+                data.name.trim().isEmpty()
+            ) {
+
+                Vars.ui.showInfoToast(
+                    "The package has no script name.",
+                    2f
+                );
+
                 return;
             }
 
-            if (data.category == null || data.category.trim().isEmpty()) {
+            if (
+                data.category == null ||
+                data.category.trim().isEmpty()
+            ) {
                 data.category = "My Scripts";
             }
 
-            if (data.author == null || data.author.trim().isEmpty()) {
+            if (
+                data.author == null ||
+                data.author.trim().isEmpty()
+            ) {
                 data.author = "Anonymous User";
             }
 
             data.name = cleanName(data.name);
             data.category = cleanName(data.category);
 
-            saveScript(data);
-            importDialog.hide();
+            saveScript(data, () -> dialog.hide());
         });
 
-        importDialog.buttons.button("Cancel", importDialog::hide);
+        dialog.buttons.button("Cancel", dialog::hide);
 
-        importDialog.show();
+        dialog.show();
     }
 
     private ScriptData parsePackage(String text) {
+
         String[] lines = text.split("\\r?\\n");
 
-        if (lines.length == 0 ||
-            !PACKAGE_HEADER.equals(lines[0].trim())) {
+        if (
+            lines.length == 0 ||
+            !PACKAGE_HEADER.equals(lines[0].trim())
+        ) {
             return null;
         }
 
-        Properties values = new Properties();
+        Properties properties = new Properties();
 
         for (int i = 1; i < lines.length; i++) {
+
             int separator = lines[i].indexOf('=');
 
-            if (separator <= 0) {
-                continue;
-            }
+            if (separator <= 0) continue;
 
             String key = lines[i].substring(0, separator);
+
             String value = lines[i].substring(separator + 1);
 
-            values.setProperty(key, value);
+            properties.setProperty(key, value);
         }
 
         ScriptData data = new ScriptData();
 
-        data.name = decode(values.getProperty("name", ""));
-        data.category = decode(values.getProperty("category", ""));
-        data.author = decode(values.getProperty("author", ""));
-        data.description = decode(values.getProperty("description", ""));
-        data.code = decode(values.getProperty("code", ""));
+        data.name = decode(properties.getProperty("name", ""));
+        data.category = decode(properties.getProperty("category", ""));
+        data.author = decode(properties.getProperty("author", ""));
+        data.description = decode(properties.getProperty("description", ""));
+        data.code = decode(properties.getProperty("code", ""));
 
         return data;
     }
 
-    // --------------------------------------------------
-    // TEXT ENCODING FOR MANUAL SHARING
-    // --------------------------------------------------
+    // ================================================
+    // PACKAGE ENCODING
+    // ================================================
 
     private String encode(String value) {
+
         if (value == null) {
             value = "";
         }
@@ -720,31 +923,35 @@ public class ScriptLibraryDialog extends BaseDialog {
     }
 
     private String decode(String value) {
+
         return new String(
             Base64.getDecoder().decode(value),
             StandardCharsets.UTF_8
         );
     }
 
-    // --------------------------------------------------
-    // FILE NAME CLEANUP
-    // --------------------------------------------------
+    // ================================================
+    // CLEAN FILE NAMES
+    // ================================================
 
     private String cleanName(String name) {
+
         if (name == null) {
             return "";
         }
 
         return name.trim()
             .replaceAll("[\\\\/:*?\"<>|]", "_")
+            .replaceAll("^[. ]+", "")
             .replaceAll("[. ]+$", "");
     }
 
-    // --------------------------------------------------
+    // ================================================
     // SCRIPT DATA
-    // --------------------------------------------------
+    // ================================================
 
     private static class ScriptData {
+
         String name = "";
         String category = "My Scripts";
         String author = "Anonymous User";
@@ -754,13 +961,15 @@ public class ScriptLibraryDialog extends BaseDialog {
         Fi file;
     }
 
-    // --------------------------------------------------
+    // ================================================
     // OPEN LIBRARY
-    // --------------------------------------------------
+    // ================================================
 
     @Override
     public void show() {
+
         refresh();
+
         super.show();
     }
 }
