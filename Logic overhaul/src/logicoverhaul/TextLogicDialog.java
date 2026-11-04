@@ -1,14 +1,18 @@
-
 package logicoverhaul;
 
+import arc.Core;
 import arc.func.Cons;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
 import arc.graphics.g2d.Font;
 import arc.graphics.g2d.Lines;
+import arc.graphics.g2d.TextureRegion;
 import arc.scene.Element;
 import arc.scene.event.ChangeListener;
 import arc.scene.event.ChangeListener.ChangeEvent;
+import arc.scene.style.Drawable;
+import arc.scene.style.TextureRegionDrawable;
+import arc.scene.ui.Image;
 import arc.scene.ui.Label;
 import arc.scene.ui.ScrollPane;
 import arc.scene.ui.TextArea;
@@ -18,168 +22,98 @@ import arc.struct.Seq;
 import arc.util.Align;
 
 import mindustry.Vars;
-import mindustry.ui.Fonts;
 import mindustry.logic.LAssembler;
 import mindustry.logic.LStatement;
 import mindustry.logic.LStatements.InvalidStatement;
+import mindustry.ui.Fonts;
 import mindustry.ui.Styles;
 import mindustry.ui.dialogs.BaseDialog;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Set;
 
 public class TextLogicDialog extends BaseDialog {
 
+    private static final String GITHUB_URL =
+        "https://github.com/gethgoated-netizen/";
+
     private SyntaxTextArea codeArea;
     private Cons<String> applyCode;
+    private TextFieldStyle editorStyle;
 
     private Label lineNumbers;
     private Label errorMarkers;
-    private Label diagnostics;
     private Label status;
+    private Label diagnosticsSummary;
+    private Label headerTitle;
+    private Label filename;
 
+    private Table header;
     private Table editorRows;
     private Table autocomplete;
+    private Table variableList;
+    private Table terminal;
+    private Table diagnosticRows;
+
     private ScrollPane editorScroll;
+    private Image githubMark;
 
-    private final Set<Integer> errorLines = new HashSet<>();
+    private final Set<Integer> errorLines =
+        new LinkedHashSet<>();
 
-    private static final Color GREEN =
-        Color.valueOf("39FF65");
+    private final ArrayList<Diagnostic> diagnostics =
+        new ArrayList<>();
 
-    private static final Color DIM_GREEN =
-        Color.valueOf("536B56");
+    private ScriptLibraryDialog scriptLibrary;
 
-    private static final Color COMMAND =
-        Color.valueOf("70D7FF");
+    // Theme colors
+    private final Color foreground = new Color();
+    private final Color secondary = new Color();
+    private final Color commandColor = new Color();
+    private final Color variableColor = new Color();
+    private final Color numberColor = new Color();
+    private final Color stringColor = new Color();
+    private final Color commentColor = new Color();
+    private final Color labelColor = new Color();
+    private final Color errorColor = new Color();
+    private final Color warningColor = new Color();
 
-    private static final Color VARIABLE =
-        Color.valueOf("76E5E5");
-
-    private static final Color NUMBER =
-        Color.valueOf("FFD479");
-
-    private static final Color STRING =
-        Color.valueOf("A6E3A1");
-
-    private static final Color COMMENT =
-        Color.valueOf("66836B");
-
-    private static final Color LABEL =
-        Color.valueOf("C9A0FF");
-
-    private static final Color ERROR =
-        Color.valueOf("FF5555");
-
-    // MINDUSTRY LOGIC COMMANDS
+    // Mindustry logic commands
     private static final String[] LOGIC_COMMANDS = {
-        "set",
-        "op",
-        "jump",
-        "sensor",
-        "control",
-        "radar",
-        "uradar",
-        "ucontrol",
-        "ulocate",
-        "getlink",
-        "read",
-        "write",
-        "print",
-        "printflush",
-        "draw",
-        "drawflush",
-        "lookup",
-        "fetch",
-        "wait",
-        "end",
-        "stop",
-        "ubind",
-        "setrate",
-        "packcolor",
-        "unpackcolor"
+        "set", "op", "jump", "sensor", "control",
+        "radar", "uradar", "ucontrol", "ulocate",
+        "getlink", "read", "write", "print",
+        "printflush", "draw", "drawflush", "lookup",
+        "fetch", "wait", "end", "stop", "ubind",
+        "setrate", "packcolor", "unpackcolor"
     };
 
-    // BUILT-IN VARIABLES
+    // Built-in variables
     private static final String[] LOGIC_VARIABLES = {
-        "@unit",
-        "@this",
-        "@health",
-        "@maxHealth",
-        "@x",
-        "@y",
-        "@dead",
-        "@time",
-        "@tick",
-        "@second",
-        "@minute",
-        "@wave",
-        "@waveTime",
-        "@mapw",
-        "@maph",
-        "@links",
-        "@counter",
-        "@team",
-        "@copper",
-        "@lead",
-        "@graph",
-        "@power",
-        "@enabled",
-        "@rotation",
-        "@shooting",
-        "@ammo",
-        "@type",
-        "@name",
-        "@flag",
-        "@totalItems",
-        "@firstItem",
-        "@itemCapacity",
-        "@powerNetStored",
-        "@powerNetCapacity"
+        "@unit", "@this", "@health", "@maxHealth",
+        "@x", "@y", "@dead", "@time", "@tick",
+        "@second", "@minute", "@wave", "@waveTime",
+        "@mapw", "@maph", "@links", "@counter",
+        "@team", "@copper", "@lead", "@graph",
+        "@power", "@enabled", "@rotation", "@shooting",
+        "@ammo", "@type", "@name", "@flag",
+        "@totalItems", "@firstItem", "@itemCapacity",
+        "@powerNetStored", "@powerNetCapacity"
     };
 
-    // LOGIC OPERATIONS
+    // Logic operations
     private static final String[] LOGIC_OPERATIONS = {
-        "add",
-        "sub",
-        "mul",
-        "div",
-        "idiv",
-        "mod",
-        "pow",
-        "equal",
-        "notEqual",
-        "land",
-        "lessThan",
-        "lessThanEq",
-        "greaterThan",
-        "greaterThanEq",
-        "strictEqual",
-        "shl",
-        "shr",
-        "or",
-        "and",
-        "xor",
-        "max",
-        "min",
-        "angle",
-        "angleDiff",
-        "len",
-        "noise",
-        "abs",
-        "log",
-        "logn",
-        "floor",
-        "ceil",
-        "sqrt",
-        "rand",
-        "sin",
-        "cos",
-        "tan",
-        "asin",
-        "acos",
-        "atan"
+        "add", "sub", "mul", "div", "idiv", "mod",
+        "pow", "equal", "notEqual", "land",
+        "lessThan", "lessThanEq", "greaterThan",
+        "greaterThanEq", "strictEqual", "shl", "shr",
+        "or", "and", "xor", "max", "min",
+        "angle", "angleDiff", "len", "noise", "abs",
+        "log", "logn", "floor", "ceil", "sqrt",
+        "rand", "sin", "cos", "tan", "asin",
+        "acos", "atan"
     };
 
     public TextLogicDialog() {
@@ -192,44 +126,31 @@ public class TextLogicDialog extends BaseDialog {
         cont.defaults().pad(4f);
 
         // HEADER
-        Table header = new Table(Styles.grayPanelDark);
+        header = new Table(Styles.grayPanelDark);
 
-        Label title = new Label(
+        headerTitle = new Label(
             "LOGIC OVERHAUL",
             Styles.monoLabel
         );
 
-        title.setColor(GREEN);
-
-        Label filename = new Label(
+        filename = new Label(
             "processor-1.mlog",
             Styles.monoLabel
         );
 
-        filename.setColor(DIM_GREEN);
-
-        header.add(title).left().pad(8f);
+        header.add(headerTitle).left().pad(8f);
         header.add().growX();
         header.add(filename).right().pad(8f);
 
         cont.add(header).growX().row();
 
         // EDITOR STYLE
-        TextFieldStyle editorStyle =
-            new TextFieldStyle(Styles.areaField);
+        editorStyle = new TextFieldStyle(Styles.areaField);
 
         editorStyle.font = Fonts.monospace;
-        editorStyle.fontColor = GREEN;
-        editorStyle.focusedFontColor = GREEN;
-
-        editorStyle.background = Styles.black;
-        editorStyle.focusedBackground = Styles.black;
 
         // CODE AREA
-        codeArea = new SyntaxTextArea(
-            "",
-            editorStyle
-        );
+        codeArea = new SyntaxTextArea("", editorStyle);
 
         codeArea.setPrefRows(18);
         codeArea.setProgrammaticChangeEvents(true);
@@ -240,7 +161,6 @@ public class TextLogicDialog extends BaseDialog {
             Styles.monoLabel
         );
 
-        lineNumbers.setColor(DIM_GREEN);
         lineNumbers.setAlignment(
             Align.top | Align.right
         );
@@ -251,7 +171,6 @@ public class TextLogicDialog extends BaseDialog {
             Styles.monoLabel
         );
 
-        errorMarkers.setColor(ERROR);
         errorMarkers.setAlignment(
             Align.top | Align.center
         );
@@ -290,52 +209,64 @@ public class TextLogicDialog extends BaseDialog {
             .minSize(500f, 300f)
             .row();
 
-        // AUTOCOMPLETE BAR
+        // AUTOCOMPLETE
         autocomplete = new Table(Styles.grayPanelDark);
         autocomplete.left();
 
         cont.add(autocomplete)
             .growX()
             .minHeight(38f)
-            .maxHeight(44f)
+            .maxHeight(48f)
             .row();
 
-        // TERMINAL
-        Table terminal = new Table(
-            Styles.grayPanelDark
-        );
+        // LIVE VARIABLE LIST
+        variableList = new Table(Styles.grayPanelDark);
+        variableList.left();
+
+        cont.add(variableList)
+            .growX()
+            .minHeight(34f)
+            .maxHeight(76f)
+            .row();
+
+        // DIAGNOSTICS
+        terminal = new Table(Styles.grayPanelDark);
 
         Label terminalTitle = new Label(
-            "TERMINAL / DIAGNOSTICS",
+            "DIAGNOSTICS",
             Styles.monoLabel
         );
 
-        terminalTitle.setColor(GREEN);
-
-        diagnostics = new Label(
+        diagnosticsSummary = new Label(
             "Editor ready.",
             Styles.monoLabel
         );
 
-        diagnostics.setColor(GREEN);
-        diagnostics.setWrap(true);
+        diagnosticsSummary.setWrap(true);
+
+        diagnosticRows = new Table();
+        diagnosticRows.left();
 
         status = new Label(
             "READY",
             Styles.monoLabel
         );
 
-        status.setColor(GREEN);
-
         terminal.add(terminalTitle)
             .left()
             .pad(6f)
             .row();
 
-        terminal.add(diagnostics)
+        terminal.add(diagnosticsSummary)
             .left()
             .growX()
             .pad(6f)
+            .row();
+
+        terminal.add(diagnosticRows)
+            .left()
+            .growX()
+            .pad(4f)
             .row();
 
         terminal.add(status)
@@ -344,10 +275,45 @@ public class TextLogicDialog extends BaseDialog {
 
         cont.add(terminal)
             .growX()
-            .maxHeight(110f)
+            .maxHeight(150f)
             .row();
 
-        // LIVE VALIDATION AND AUTOCOMPLETE
+        // GITHUB CREDIT
+        Table credits = new Table(Styles.grayPanelDark);
+
+        credits.add().growX();
+
+        TextureRegion logoRegion =
+            Core.atlas.find("github", Core.atlas.white());
+
+        githubMark = new Image(logoRegion);
+
+        credits.add(githubMark)
+            .size(20f)
+            .pad(4f);
+
+        credits.button(
+            GITHUB_URL,
+            () -> Core.app.openURI(GITHUB_URL)
+        )
+        .right()
+        .pad(4f);
+
+        cont.add(credits)
+            .growX()
+            .row();
+
+        // SCRIPT LIBRARY CONNECTION
+        scriptLibrary = new ScriptLibraryDialog(
+            source -> {
+                codeArea.setText(source);
+                refreshEditor();
+            },
+            this::insertAtCursor,
+            () -> codeArea.getText()
+        );
+
+        // LIVE EDITOR UPDATES
         codeArea.addListener(new ChangeListener() {
             @Override
             public void changed(
@@ -359,7 +325,7 @@ public class TextLogicDialog extends BaseDialog {
         });
 
         // BUTTONS
-        buttons.defaults().size(180f, 54f);
+        buttons.defaults().size(160f, 52f);
 
         buttons.button(
             "Apply to Visual Editor",
@@ -380,13 +346,210 @@ public class TextLogicDialog extends BaseDialog {
             }
         );
 
+        buttons.button(
+            "Save to Library",
+            () -> scriptLibrary.showSaveDialog(
+                codeArea.getText()
+            )
+        );
+
+        buttons.button(
+            "Script Library",
+            () -> scriptLibrary.show()
+        );
+
         buttons.button("Cancel", this::hide);
 
-        updateAutocomplete();
+        applyTheme();
+        refreshEditor();
     }
 
-    // UPDATE EDITOR INFORMATION
+    // ==================================================
+    // THEME APPLICATION
+    // ==================================================
+
+    private void applyTheme() {
+
+        String theme = Core.settings.getString(
+            LogicOverhaulMod.THEME_SETTING,
+            "classic"
+        );
+
+        Palette p = paletteFor(theme);
+
+        foreground.set(Color.valueOf(p.foreground));
+        secondary.set(Color.valueOf(p.secondary));
+        commandColor.set(Color.valueOf(p.command));
+        variableColor.set(Color.valueOf(p.variable));
+        numberColor.set(Color.valueOf(p.number));
+        stringColor.set(Color.valueOf(p.string));
+        commentColor.set(Color.valueOf(p.comment));
+        labelColor.set(Color.valueOf(p.label));
+        errorColor.set(Color.valueOf(p.error));
+        warningColor.set(Color.valueOf(p.warning));
+
+        Drawable bg = solid(p.background);
+        Drawable panel = solid(p.panel);
+        Drawable editor = solid(p.editor);
+
+        background(bg);
+        cont.background(bg);
+
+        header.background(panel);
+        terminal.background(panel);
+        autocomplete.background(panel);
+        variableList.background(panel);
+        editorRows.background(editor);
+
+        editorStyle.font = Fonts.monospace;
+        editorStyle.fontColor = foreground.cpy();
+        editorStyle.focusedFontColor = foreground.cpy();
+        editorStyle.background = editor;
+        editorStyle.focusedBackground = editor;
+
+        codeArea.setStyle(editorStyle);
+
+        headerTitle.setColor(commandColor);
+        filename.setColor(secondary);
+
+        lineNumbers.setColor(secondary);
+        errorMarkers.setColor(errorColor);
+
+        diagnosticsSummary.setColor(foreground);
+        status.setColor(commandColor);
+
+        githubMark.setColor(foreground);
+
+        invalidateHierarchy();
+        refreshEditor();
+    }
+
+    private Palette paletteFor(String theme) {
+
+        switch (theme) {
+
+            case "midnight":
+                return new Palette(
+                    "08111B", "111C29", "070E17",
+                    "D8E2EA", "778B9D",
+                    "76B7A5", "83C8B8", "E4BD70",
+                    "B5D6A2", "708A7E", "C6D3B8",
+                    "E56868", "D99A55"
+                );
+
+            case "light":
+                return new Palette(
+                    "E8ECEF", "D4DCE1", "FFFFFF",
+                    "263238", "76838B",
+                    "2E765A", "197D73", "A66A00",
+                    "548A45", "8B969D", "76569A",
+                    "CF3030", "B36A22"
+                );
+
+            case "contrast":
+                return new Palette(
+                    "000000", "090909", "000000",
+                    "FFFFFF", "C7C7C7",
+                    "FFFF00", "00FFFF", "FFB000",
+                    "A8FF00", "B0B0B0", "FFFFFF",
+                    "FF3333", "FF9900"
+                );
+
+            case "base":
+                return new Palette(
+                    "282828", "3B3B3B", "202020",
+                    "E7E7E7", "A4A4A4",
+                    "FFFFFF", "B5D7B8", "E5C16B",
+                    "B7D5A8", "929292", "E0C38D",
+                    "F06464", "E8A34F"
+                );
+
+            case "terminal":
+                // Dark Windows Terminal-inspired palette.
+                // No blue or purple syntax accents.
+                return new Palette(
+                    "101113", "191B1E", "0B0C0E",
+                    "E0E2E4", "858A8F",
+                    "C8B58E", "A8B99D", "D8A85D",
+                    "D1C9A9", "737A70", "E0CA91",
+                    "E05B5B", "D28B45"
+                );
+
+            case "classic":
+            default:
+                // Original Classic Terminal theme.
+                return new Palette(
+                    "000000", "151A16", "000000",
+                    "39FF65", "536B56",
+                    "70D7FF", "76E5E5", "FFD479",
+                    "A6E3A1", "66836B", "C9A0FF",
+                    "FF5555", "FFAA44"
+                );
+        }
+    }
+
+    private Drawable solid(String color) {
+        return new TextureRegionDrawable(
+            Core.atlas.white()
+        ).tint(Color.valueOf(color));
+    }
+
+    private static class Palette {
+
+        final String background;
+        final String panel;
+        final String editor;
+        final String foreground;
+        final String secondary;
+
+        final String command;
+        final String variable;
+        final String number;
+        final String string;
+        final String comment;
+        final String label;
+        final String error;
+        final String warning;
+
+        Palette(
+            String background,
+            String panel,
+            String editor,
+            String foreground,
+            String secondary,
+            String command,
+            String variable,
+            String number,
+            String string,
+            String comment,
+            String label,
+            String error,
+            String warning
+        ) {
+            this.background = background;
+            this.panel = panel;
+            this.editor = editor;
+            this.foreground = foreground;
+            this.secondary = secondary;
+
+            this.command = command;
+            this.variable = variable;
+            this.number = number;
+            this.string = string;
+            this.comment = comment;
+            this.label = label;
+            this.error = error;
+            this.warning = warning;
+        }
+    }
+
+    // ==================================================
+    // LIVE EDITOR REFRESH
+    // ==================================================
+
     private void refreshEditor() {
+
+        if (codeArea == null) return;
 
         String source = codeArea.getText();
 
@@ -403,15 +566,12 @@ public class TextLogicDialog extends BaseDialog {
 
             numbers.append(i);
 
-            if (i < count) {
-                numbers.append('\n');
-            }
-
             markers.append(
                 errorLines.contains(i) ? "!" : " "
             );
 
             if (i < count) {
+                numbers.append('\n');
                 markers.append('\n');
             }
         }
@@ -419,22 +579,20 @@ public class TextLogicDialog extends BaseDialog {
         lineNumbers.setText(numbers.toString());
         errorMarkers.setText(markers.toString());
 
-        codeArea.setPrefRows(
-            Math.max(18, count)
-        );
+        codeArea.setPrefRows(Math.max(18, count));
 
         editorRows.invalidateHierarchy();
         editorScroll.invalidateHierarchy();
 
         updateAutocomplete();
+        updateVariableList(source);
     }
 
+    // ==================================================
     // AUTOCOMPLETE
-    private void updateAutocomplete() {
+    // ==================================================
 
-        if (autocomplete == null || codeArea == null) {
-            return;
-        }
+    private void updateAutocomplete() {
 
         autocomplete.clear();
 
@@ -442,11 +600,8 @@ public class TextLogicDialog extends BaseDialog {
 
         int cursor = codeArea.getCursorPosition();
 
-        if (cursor < 0 || cursor > source.length()) {
-            return;
-        }
+        if (cursor < 0 || cursor > source.length()) return;
 
-        // Find the beginning of the current word.
         int tokenStart = cursor;
 
         while (tokenStart > 0) {
@@ -464,28 +619,16 @@ public class TextLogicDialog extends BaseDialog {
             tokenStart--;
         }
 
-        String prefix = source.substring(
-            tokenStart,
-            cursor
-        );
+        String prefix = source.substring(tokenStart, cursor);
 
         if (prefix.isEmpty()) {
-
-            Label hint = new Label(
-                "TYPE TO SEE SUGGESTIONS",
-                Styles.monoLabel
+            addHint(
+                autocomplete,
+                "SUGGESTIONS: TYPE A COMMAND OR VARIABLE"
             );
-
-            hint.setColor(DIM_GREEN);
-
-            autocomplete.add(hint)
-                .left()
-                .pad(5f);
-
             return;
         }
 
-        // Find the current instruction.
         int lineStart = source.lastIndexOf(
             '\n',
             Math.max(0, tokenStart - 1)
@@ -499,116 +642,109 @@ public class TextLogicDialog extends BaseDialog {
         int semicolon = beforeToken.lastIndexOf(';');
 
         if (semicolon >= 0) {
-            beforeToken = beforeToken.substring(
-                semicolon + 1
-            );
+            beforeToken = beforeToken.substring(semicolon + 1);
         }
 
         boolean commandPosition =
             beforeToken.trim().isEmpty();
 
-        ArrayList<String> suggestions =
-            new ArrayList<>();
+        ArrayList<String> matches = new ArrayList<>();
 
         if (commandPosition) {
 
             addMatching(
-                suggestions,
+                matches,
                 LOGIC_COMMANDS,
                 prefix
             );
 
         } else {
 
-            // Suggest built-in variables.
             addMatching(
-                suggestions,
+                matches,
                 LOGIC_VARIABLES,
                 prefix
             );
 
-            // Suggest operation names.
             addMatching(
-                suggestions,
+                matches,
                 LOGIC_OPERATIONS,
                 prefix
             );
 
-            // Suggest common logic values.
             addMatching(
-                suggestions,
+                matches,
                 new String[]{
                     "true",
                     "false",
                     "null",
-                    "always",
-                    "equal",
-                    "notEqual",
-                    "lessThan",
-                    "greaterThan",
-                    "lessThanEq",
-                    "greaterThanEq"
+                    "always"
                 },
                 prefix
             );
 
-            // Suggest variables declared in the script.
-            addDeclaredVariables(
-                suggestions,
-                source,
+            addMatching(
+                matches,
+                declaredVariables(source).toArray(
+                    new String[0]
+                ),
                 prefix
             );
         }
 
-        if (suggestions.isEmpty()) {
-
-            Label hint = new Label(
-                "NO MATCHING SUGGESTIONS",
-                Styles.monoLabel
-            );
-
-            hint.setColor(DIM_GREEN);
-
-            autocomplete.add(hint)
-                .left()
-                .pad(5f);
-
+        if (matches.isEmpty()) {
+            addHint(autocomplete, "NO MATCHING SUGGESTIONS");
             return;
         }
 
-        int shown = Math.min(5, suggestions.size());
+        int shown = Math.min(6, matches.size());
 
         for (int i = 0; i < shown; i++) {
 
-            final String suggestion = suggestions.get(i);
+            String suggestion = matches.get(i);
 
-            final int insertAt = tokenStart;
-            final int insertEnd = cursor;
+            final int start = tokenStart;
+            final int end = cursor;
 
             autocomplete.button(
                 suggestion,
-                () -> insertAutocomplete(
+                () -> insertSuggestion(
                     suggestion,
-                    insertAt,
-                    insertEnd
+                    start,
+                    end
                 )
-            ).size(100f, 32f);
+            )
+            .size(110f, 32f)
+            .pad(2f);
         }
     }
 
-    // ADD MATCHING SUGGESTIONS
+    private void addHint(Table table, String message) {
+
+        Label hint = new Label(
+            message,
+            Styles.monoLabel
+        );
+
+        hint.setColor(secondary);
+
+        table.add(hint)
+            .left()
+            .pad(5f);
+    }
+
     private void addMatching(
         ArrayList<String> output,
         String[] choices,
         String prefix
     ) {
 
+        String lower = prefix.toLowerCase(Locale.ROOT);
+
         for (String choice : choices) {
 
             if (
-                choice.toLowerCase().startsWith(
-                    prefix.toLowerCase()
-                ) &&
+                choice.toLowerCase(Locale.ROOT).startsWith(lower) &&
                 !output.contains(choice)
             ) {
                 output.add(choice);
@@ -616,61 +752,7 @@ public class TextLogicDialog extends BaseDialog {
         }
     }
 
-    // FIND VARIABLES DECLARED IN THE SCRIPT
-    private void addDeclaredVariables(
-        ArrayList<String> output,
-        String source,
-        String prefix
-    ) {
-
-        String[] lines = source.split("\n");
-
-        for (String line : lines) {
-
-            String trimmed = line.trim();
-
-            if (
-                trimmed.startsWith("#") ||
-                trimmed.isEmpty()
-            ) {
-                continue;
-            }
-
-            String[] parts = trimmed.split("\\s+");
-
-            if (parts.length < 2) {
-                continue;
-            }
-
-            String command = parts[0];
-
-            if (
-                command.equals("set") ||
-                command.equals("op") ||
-                command.equals("sensor") ||
-                command.equals("read") ||
-                command.equals("getlink") ||
-                command.equals("lookup") ||
-                command.equals("fetch") ||
-                command.equals("getflag")
-            ) {
-
-                String variable = parts[1];
-
-                if (
-                    variable.toLowerCase().startsWith(
-                        prefix.toLowerCase()
-                    ) &&
-                    !output.contains(variable)
-                ) {
-                    output.add(variable);
-                }
-            }
-        }
-    }
-
-    // INSERT SELECTED AUTOCOMPLETE ITEM
-    private void insertAutocomplete(
+    private void insertSuggestion(
         String suggestion,
         int start,
         int end
@@ -700,17 +782,139 @@ public class TextLogicDialog extends BaseDialog {
         refreshEditor();
     }
 
-    // CHECK CODE USING MINDUSTRY'S LOGIC PARSER
+    // ==================================================
+    // INSERT AT CURSOR
+    // ==================================================
+
+    private void insertAtCursor(String insertion) {
+
+        if (insertion == null || insertion.isEmpty()) {
+            return;
+        }
+
+        String source = codeArea.getText();
+
+        int cursor = Math.max(
+            0,
+            Math.min(
+                codeArea.getCursorPosition(),
+                source.length()
+            )
+        );
+
+        String updated =
+            source.substring(0, cursor)
+            + insertion
+            + source.substring(cursor);
+
+        codeArea.setText(updated);
+
+        codeArea.setCursorPosition(
+            cursor + insertion.length()
+        );
+
+        refreshEditor();
+    }
+
+    // ==================================================
+    // LIVE VARIABLE LIST
+    // ==================================================
+
+    private void updateVariableList(String source) {
+
+        variableList.clear();
+
+        variableList.add("VARIABLES")
+            .left()
+            .pad(5f);
+
+        Set<String> names = declaredVariables(source);
+
+        if (names.isEmpty()) {
+
+            Label empty = new Label(
+                "No user variables declared yet",
+                Styles.monoLabel
+            );
+
+            empty.setColor(secondary);
+
+            variableList.add(empty)
+                .left()
+                .pad(5f);
+
+            return;
+        }
+
+        for (String name : names) {
+
+            variableList.button(
+                name,
+                () -> insertAtCursor(name)
+            )
+            .size(100f, 28f)
+            .pad(2f);
+        }
+    }
+
+    private Set<String> declaredVariables(String source) {
+
+        Set<String> names = new LinkedHashSet<>();
+
+        String[] lines = source.split("\n");
+
+        for (String line : lines) {
+
+            String trimmed = line.trim();
+
+            if (
+                trimmed.isEmpty() ||
+                trimmed.startsWith("#")
+            ) {
+                continue;
+            }
+
+            String[] parts = trimmed.split("\\s+");
+
+            if (parts.length < 2) continue;
+
+            String command = parts[0];
+
+            if (
+                command.equals("set") ||
+                command.equals("op") ||
+                command.equals("sensor") ||
+                command.equals("read") ||
+                command.equals("getlink") ||
+                command.equals("lookup") ||
+                command.equals("fetch") ||
+                command.equals("getflag")
+            ) {
+
+                String name = parts[1];
+
+                if (
+                    !name.startsWith("@") &&
+                    !name.endsWith(":")
+                ) {
+                    names.add(name);
+                }
+            }
+        }
+
+        return names;
+    }
+
+    // ==================================================
+    // MINDUSTRY ASSEMBLER VALIDATION
+    // ==================================================
+
     private void validateCode(String source) {
 
         errorLines.clear();
+        diagnostics.clear();
 
         String[] lines = source.split("\n", -1);
-
-        ArrayList<String> messages =
-            new ArrayList<>();
-
-        int errorCount = 0;
 
         for (int i = 0; i < lines.length; i++) {
 
@@ -724,51 +928,36 @@ public class TextLogicDialog extends BaseDialog {
                 continue;
             }
 
-            // Named jumps need the complete script
-            // because their destination label may be later.
-            if (isNamedJump(trimmed)) {
-                continue;
-            }
+            if (isNamedJump(trimmed)) continue;
 
             try {
 
                 Seq<LStatement> parsed =
                     LAssembler.read(lines[i], false);
 
-                boolean invalid = false;
-
                 for (LStatement statement : parsed) {
+
                     if (statement instanceof InvalidStatement) {
-                        invalid = true;
+
+                        addDiagnostic(
+                            i + 1,
+                            "Invalid instruction or arguments."
+                        );
+
                         break;
                     }
                 }
 
-                if (invalid) {
-
-                    errorLines.add(i + 1);
-                    errorCount++;
-
-                    messages.add(
-                        "Line " + (i + 1) +
-                        ": Invalid instruction or arguments."
-                    );
-                }
-
             } catch (Throwable error) {
 
-                errorLines.add(i + 1);
-                errorCount++;
-
-                messages.add(
-                    "Line " + (i + 1) +
-                    ": " + errorMessage(error)
+                addDiagnostic(
+                    i + 1,
+                    errorMessage(error)
                 );
             }
         }
 
-        // Check the complete script for errors,
-        // including unresolved jump labels.
+        // Check the complete script as well.
         try {
 
             LAssembler.assemble(source, false);
@@ -777,55 +966,132 @@ public class TextLogicDialog extends BaseDialog {
 
             String message = errorMessage(error);
 
-            // Avoid adding the exact same error twice.
-            if (!messages.contains("Script: " + message)) {
+            boolean alreadyShown = false;
 
-                messages.add(
-                    "Script: " + message
-                );
+            for (Diagnostic diagnostic : diagnostics) {
 
-                errorCount++;
-            }
-        }
-
-        if (errorCount == 0) {
-
-            diagnostics.setText(
-                "No instruction errors detected."
-            );
-
-            status.setText(
-                "READY | " + lines.length + " LINES"
-            );
-
-            status.setColor(GREEN);
-
-        } else {
-
-            StringBuilder output = new StringBuilder();
-
-            int shown = Math.min(4, messages.size());
-
-            for (int i = 0; i < shown; i++) {
-
-                output.append(messages.get(i));
-
-                if (i < shown - 1) {
-                    output.append('\n');
+                if (diagnostic.message.equals(message)) {
+                    alreadyShown = true;
+                    break;
                 }
             }
 
-            if (messages.size() > shown) {
-                output.append("\n...and more errors.");
+            if (!alreadyShown) {
+                diagnostics.add(
+                    new Diagnostic(0, "Script: " + message)
+                );
             }
+        }
 
-            diagnostics.setText(output.toString());
+        diagnosticRows.clear();
 
-            status.setText(
-                "ERRORS: " + errorCount
+        if (diagnostics.isEmpty()) {
+
+            diagnosticsSummary.setText(
+                "No instruction errors detected."
             );
 
-            status.setColor(ERROR);
+            Label none = new Label(
+                "No errors found by Mindustry's logic assembler.",
+                Styles.monoLabel
+            );
+
+            none.setColor(commandColor);
+
+            diagnosticRows.add(none).left();
+
+            status.setText(
+                "READY | " + lines.length +
+                " LINES | " +
+                declaredVariables(source).size() +
+                " VARIABLES"
+            );
+
+            status.setColor(commandColor);
+
+        } else {
+
+            diagnosticsSummary.setText(
+                diagnostics.size() +
+                " issue(s) found. Select an entry to jump to its line."
+            );
+
+            for (Diagnostic diagnostic : diagnostics) {
+
+                final int line = diagnostic.line;
+
+                String text =
+                    (line > 0 ? "LINE " + line + ": " : "SCRIPT: ")
+                    + diagnostic.message;
+
+                diagnosticRows.button(
+                    text,
+                    () -> {
+                        if (line > 0) {
+                            jumpToLine(line);
+                        }
+                    }
+                )
+                .growX()
+                .left()
+                .pad(2f)
+                .row();
+            }
+
+            status.setText(
+                "ERRORS: " + diagnostics.size()
+            );
+
+            status.setColor(errorColor);
+        }
+    }
+
+    private void addDiagnostic(
+        int line,
+        String message
+    ) {
+
+        if (line > 0) {
+            errorLines.add(line);
+        }
+
+        for (Diagnostic existing : diagnostics) {
+
+            if (
+                existing.line == line &&
+                existing.message.equals(message)
+            ) {
+                return;
+            }
+        }
+
+        diagnostics.add(
+            new Diagnostic(line, message)
+        );
+    }
+
+    private void jumpToLine(int line) {
+
+        String source = codeArea.getText();
+
+        int offset = 0;
+
+        String[] lines = source.split("\n", -1);
+
+        for (
+            int i = 1;
+            i < line && i <= lines.length;
+            i++
+        ) {
+            offset += lines[i - 1].length() + 1;
+        }
+
+        codeArea.setCursorPosition(
+            Math.min(offset, source.length())
+        );
+
+        if (Core.scene != null) {
+            Core.scene.setKeyboardFocus(codeArea);
         }
     }
 
@@ -841,8 +1107,10 @@ public class TextLogicDialog extends BaseDialog {
         }
 
         try {
+
             Integer.parseInt(parts[1]);
             return false;
+
         } catch (NumberFormatException ignored) {
             return true;
         }
@@ -859,12 +1127,25 @@ public class TextLogicDialog extends BaseDialog {
             return error.getClass().getSimpleName();
         }
 
-        return message
-            .replace('\n', ' ')
+        return message.replace('\n', ' ')
             .replace('\r', ' ');
     }
 
-    // SYNTAX-HIGHLIGHTED TEXT AREA
+    private static class Diagnostic {
+
+        final int line;
+        final String message;
+
+        Diagnostic(int line, String message) {
+            this.line = line;
+            this.message = message;
+        }
+    }
+
+    // ==================================================
+    // SYNTAX HIGHLIGHTING
+    // ==================================================
+
     private class SyntaxTextArea extends TextArea {
 
         SyntaxTextArea(
@@ -888,7 +1169,7 @@ public class TextLogicDialog extends BaseDialog {
             for (
                 int i = firstLineShowing * 2;
                 i < (firstLineShowing + linesShowing) * 2 &&
-                i < linesBreak.size;
+                    i < linesBreak.size;
                 i += 2
             ) {
 
@@ -906,14 +1187,14 @@ public class TextLogicDialog extends BaseDialog {
                     physicalLine
                 );
 
-                // Red underline on invalid lines.
+                // Red underline for detected errors.
                 if (errorLines.contains(physicalLine)) {
 
                     float width =
                         glyphPositions.get(end) -
                         glyphPositions.get(start);
 
-                    Draw.color(ERROR);
+                    Draw.color(errorColor);
                     Lines.stroke(1.2f);
 
                     Lines.line(
@@ -942,6 +1223,7 @@ public class TextLogicDialog extends BaseDialog {
         ) {
 
             int pos = start;
+
             boolean firstToken = true;
 
             while (pos < end) {
@@ -957,8 +1239,13 @@ public class TextLogicDialog extends BaseDialog {
                 if (c == '#') {
 
                     drawRange(
-                        font, x, y, start,
-                        pos, end, COMMENT
+                        font,
+                        x,
+                        y,
+                        start,
+                        pos,
+                        end,
+                        commentColor
                     );
 
                     break;
@@ -989,8 +1276,13 @@ public class TextLogicDialog extends BaseDialog {
                     }
 
                     drawRange(
-                        font, x, y, start,
-                        pos, tokenEnd, STRING
+                        font,
+                        x,
+                        y,
+                        start,
+                        pos,
+                        tokenEnd,
+                        stringColor
                     );
 
                     pos = tokenEnd;
@@ -1003,8 +1295,13 @@ public class TextLogicDialog extends BaseDialog {
                 if (c == ';') {
 
                     drawRange(
-                        font, x, y, start,
-                        pos, pos + 1, DIM_GREEN
+                        font,
+                        x,
+                        y,
+                        start,
+                        pos,
+                        pos + 1,
+                        secondary
                     );
 
                     pos++;
@@ -1030,8 +1327,7 @@ public class TextLogicDialog extends BaseDialog {
                     tokenEnd++;
                 }
 
-                String token =
-                    text.substring(pos, tokenEnd);
+                String token = text.substring(pos, tokenEnd);
 
                 Color tokenColor;
 
@@ -1039,21 +1335,29 @@ public class TextLogicDialog extends BaseDialog {
                     firstToken &&
                     errorLines.contains(physicalLine)
                 ) {
-                    tokenColor = ERROR;
+                    tokenColor = errorColor;
 
                 } else if (firstToken) {
-                    tokenColor = COMMAND;
+
+                    tokenColor = commandColor;
 
                 } else if (token.endsWith(":")) {
-                    tokenColor = LABEL;
+
+                    tokenColor = labelColor;
 
                 } else {
+
                     tokenColor = classifyToken(token);
                 }
 
                 drawRange(
-                    font, x, y, start,
-                    pos, tokenEnd, tokenColor
+                    font,
+                    x,
+                    y,
+                    start,
+                    pos,
+                    tokenEnd,
+                    tokenColor
                 );
 
                 pos = tokenEnd;
@@ -1063,8 +1367,11 @@ public class TextLogicDialog extends BaseDialog {
 
         private Color classifyToken(String token) {
 
-            if (token.startsWith("@") || token.startsWith("_")) {
-                return VARIABLE;
+            if (
+                token.startsWith("@") ||
+                token.startsWith("_")
+            ) {
+                return variableColor;
             }
 
             if (
@@ -1072,30 +1379,30 @@ public class TextLogicDialog extends BaseDialog {
                 token.equals("false") ||
                 token.equals("null")
             ) {
-                return LABEL;
+                return labelColor;
             }
 
             if (isNumber(token)) {
-                return NUMBER;
+                return numberColor;
             }
 
-            return GREEN;
+            return foreground;
         }
 
         private boolean isNumber(String token) {
 
             try {
+
                 Double.parseDouble(token);
                 return true;
-            } catch (NumberFormatException ignored) {
-                // Check other number formats.
-            }
 
-            return token.matches(
-                "(?i)[+-]?0x[0-9a-f]+" +
-                "|[+-]?0b[01]+" +
-                "|%[0-9a-f]{6}([0-9a-f]{2})?"
-            );
+            } catch (NumberFormatException ignored) {
+                return token.matches(
+                    "(?i)[+-]?0x[0-9a-f]+" +
+                    "|[+-]?0b[01]+" +
+                    "|%[0-9a-f]{6}([0-9a-f]{2})?"
+                );
+            }
         }
 
         private void drawRange(
@@ -1108,9 +1415,7 @@ public class TextLogicDialog extends BaseDialog {
             Color color
         ) {
 
-            if (end <= start) {
-                return;
-            }
+            if (end <= start) return;
 
             float offset =
                 glyphPositions.get(start) -
@@ -1145,7 +1450,10 @@ public class TextLogicDialog extends BaseDialog {
         }
     }
 
+    // ==================================================
     // OPEN EDITOR
+    // ==================================================
+
     public void showEditor(
         String currentCode,
         Cons<String> apply
@@ -1153,8 +1461,11 @@ public class TextLogicDialog extends BaseDialog {
 
         applyCode = apply;
 
-        codeArea.setText(currentCode);
+        codeArea.setText(
+            currentCode == null ? "" : currentCode
+        );
 
+        applyTheme();
         refreshEditor();
 
         show();
