@@ -39,5 +39,6 @@ jar {
 
     from(rootDir) {
         include "mod.hjson"
+        include "assets/**"
     }
 }
