@@ -969,4 +969,5 @@ public class ScriptLibraryDialog extends BaseDialog {
 public arc.scene.ui.Dialog show() {
     refresh();
     return super.show();
+    }
 }
