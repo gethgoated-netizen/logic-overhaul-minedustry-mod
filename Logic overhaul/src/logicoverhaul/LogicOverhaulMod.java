@@ -36,22 +36,26 @@ public class LogicOverhaulMod extends Mod {
     @Override
     public void init() {
 
-        // Preserve existing mouse and cursor tracking.
+        // Track mouse and update logic variables.
         Events.run(Trigger.update, () -> {
+
             cursorX = Core.input.mouseWorldX();
             cursorY = Core.input.mouseWorldY();
 
             mouseLeft = Core.input.keyDown(KeyCode.mouseLeft);
             mouseRight = Core.input.keyDown(KeyCode.mouseRight);
+
+            updateMouseLogicVariables();
         });
 
         Events.on(ClientLoadEvent.class, event -> {
 
             Core.settings.defaults(THEME_SETTING, "classic");
 
+            registerMouseLogicVariables();
+
             addEditorSettings();
 
-            // Preserve the existing text editor connection.
             textEditor = new TextLogicDialog();
 
             Vars.ui.logic.shown(() -> {
@@ -71,7 +75,44 @@ public class LogicOverhaulMod extends Mod {
         });
     }
 
-    // Editor settings category.
+    // Register variables with Mindustry's logic system.
+    private void registerMouseLogicVariables() {
+
+        registerVariable("@cursorX");
+        registerVariable("@cursorY");
+        registerVariable("@mouseLeft");
+        registerVariable("@mouseRight");
+
+        Log.info("[Logic Overhaul] Mouse logic variables registered!");
+    }
+
+    private void registerVariable(String name) {
+
+        if (Vars.logicVars.get(name) == null) {
+            Vars.logicVars.putEntry(name, 0);
+        }
+    }
+
+    // Update their values continuously.
+    private void updateMouseLogicVariables() {
+
+        if (Vars.logicVars == null) return;
+
+        setVariable("@cursorX", cursorX);
+        setVariable("@cursorY", cursorY);
+
+        setVariable("@mouseLeft", mouseLeft ? 1 : 0);
+        setVariable("@mouseRight", mouseRight ? 1 : 0);
+    }
+
+    private void setVariable(String name, double value) {
+
+        if (Vars.logicVars.get(name) != null) {
+            Vars.logicVars.set(name, value);
+        }
+    }
+
+    // Editor settings.
     private void addEditorSettings() {
 
         Vars.ui.settings.addCategory("Logic Overhaul", table -> {
@@ -97,7 +138,6 @@ public class LogicOverhaulMod extends Mod {
         });
     }
 
-    // Theme selection dialog.
     private void showThemeDialog() {
 
         BaseDialog dialog =
@@ -105,11 +145,6 @@ public class LogicOverhaulMod extends Mod {
 
         String selected =
             Core.settings.getString(THEME_SETTING, "classic");
-
-        dialog.cont.add("Choose your preferred editor theme.")
-            .left()
-            .padBottom(10f)
-            .row();
 
         for (String[] theme : THEMES) {
 
