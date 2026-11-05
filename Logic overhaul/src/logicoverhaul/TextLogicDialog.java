@@ -92,7 +92,8 @@ public class TextLogicDialog extends BaseDialog {
 
     // Built-in variables
     private static final String[] LOGIC_VARIABLES = {
-        "@unit", "@this", "@health", "@maxHealth",
+        "@unit", "@cursorX", "@cursorY", "@mouseLeft", 
+        "@mouseRight", "@this", "@health", "@maxHealth",
         "@x", "@y", "@dead", "@time", "@tick",
         "@second", "@minute", "@wave", "@waveTime",
         "@mapw", "@maph", "@links", "@counter",
