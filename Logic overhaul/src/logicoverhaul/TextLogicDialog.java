@@ -1,6 +1,7 @@
 package logicoverhaul;
 
 import arc.Core;
+import arc.input.KeyCode;
 import arc.func.Cons;
 import arc.graphics.Color;
 import arc.graphics.g2d.Draw;
@@ -92,8 +93,10 @@ public class TextLogicDialog extends BaseDialog {
 
     // Built-in variables
     private static final String[] LOGIC_VARIABLES = {
-        "@unit", "@cursorX", "@cursorY", "@mouseLeft", 
-        "@mouseRight", "@this", "@health", "@maxHealth",
+        "@unit", "@cursorX", "@cursorY", "@mouseLeft",
+        "@mouseRight", "@mouseMiddle", "@keyAny",
+        "@keyUp", "@keyDown", "@keyLeft", "@keyRight",
+        "@this", "@health", "@maxHealth",
         "@x", "@y", "@dead", "@time", "@tick",
         "@second", "@minute", "@wave", "@waveTime",
         "@mapw", "@maph", "@links", "@counter",
@@ -663,7 +666,7 @@ public class TextLogicDialog extends BaseDialog {
 
             addMatching(
                 matches,
-                LOGIC_VARIABLES,
+                allLogicVariables(),
                 prefix
             );
 
@@ -718,6 +721,30 @@ public class TextLogicDialog extends BaseDialog {
             .size(110f, 32f)
             .pad(2f);
         }
+    }
+
+    // Automatically adds all keyboard variables to autocomplete.
+    private String[] allLogicVariables() {
+
+        LinkedHashSet<String> all = new LinkedHashSet<>();
+
+        for (String variable : LOGIC_VARIABLES) {
+            all.add(variable);
+        }
+
+        // Keep autocomplete synchronized with every keyboard key
+        // registered by LogicOverhaulMod.
+        for (KeyCode key : KeyCode.values()) {
+
+            if (LogicOverhaulMod.isKeyboardKey(key)) {
+
+                all.add(
+                    LogicOverhaulMod.keyVariableName(key)
+                );
+            }
+        }
+
+        return all.toArray(new String[0]);
     }
 
     private void addHint(Table table, String message) {
