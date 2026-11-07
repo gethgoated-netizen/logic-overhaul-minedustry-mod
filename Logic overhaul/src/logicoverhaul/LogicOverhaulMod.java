@@ -1,4 +1,3 @@
-
 package logicoverhaul;
 
 import arc.Core;
@@ -16,6 +15,8 @@ import mindustry.game.EventType.ClientLoadEvent;
 import mindustry.gen.Tex;
 import mindustry.ui.Styles;
 import mindustry.ui.dialogs.BaseDialog;
+
+import java.util.Locale;
 
 public class LogicOverhaulMod extends Mod {
 
@@ -39,6 +40,7 @@ public class LogicOverhaulMod extends Mod {
 
     public static boolean mouseLeft;
     public static boolean mouseRight;
+    public static boolean mouseMiddle;
 
     public static boolean keyUp;
     public static boolean keyDown;
@@ -52,13 +54,17 @@ public class LogicOverhaulMod extends Mod {
 
     private Label cursorXLabel;
     private Label cursorYLabel;
+
     private Label mouseLeftLabel;
     private Label mouseRightLabel;
+    private Label mouseMiddleLabel;
 
     private Label keyUpLabel;
     private Label keyDownLabel;
     private Label keyLeftLabel;
     private Label keyRightLabel;
+
+    private Label keysHeldLabel;
 
     private boolean hudVisible;
     private boolean capturingKeybind;
@@ -73,13 +79,13 @@ public class LogicOverhaulMod extends Mod {
 
         loadDebugKey();
 
+        // Update input and logic variables continuously.
         Events.run(Trigger.update, () -> {
 
             updateInputValues();
-            updateMouseLogicVariables();
+            updateLogicVariables();
             updateHudValues();
 
-            // Capture a replacement key before checking the toggle.
             if (capturingKeybind) {
                 captureDebugKey();
                 return;
@@ -87,7 +93,7 @@ public class LogicOverhaulMod extends Mod {
 
             if (Core.scene == null) return;
 
-            // Do not trigger the HUD while typing or using a dialog.
+            // Don't toggle the HUD while typing or using dialogs.
             if (Core.scene.getKeyboardFocus() instanceof TextField) {
                 return;
             }
@@ -97,6 +103,7 @@ public class LogicOverhaulMod extends Mod {
             }
 
             if (Core.input.keyTap(debugKey)) {
+
                 hudVisible = !hudVisible;
 
                 if (hudRoot != null) {
@@ -108,7 +115,9 @@ public class LogicOverhaulMod extends Mod {
         Events.on(ClientLoadEvent.class, event -> {
 
             registerLogicVariables();
+
             addEditorSettings();
+
             createDebugHud();
 
             textEditor = new TextLogicDialog();
@@ -116,10 +125,12 @@ public class LogicOverhaulMod extends Mod {
             Vars.ui.logic.shown(() -> {
 
                 Vars.ui.logic.buttons.button("Text Editor", () -> {
+
                     textEditor.showEditor(
                         Vars.ui.logic.canvas.save(),
                         code -> Vars.ui.logic.canvas.load(code)
                     );
+
                 }).size(160f, 64f)
                   .name("logic-overhaul-text");
             });
@@ -129,22 +140,52 @@ public class LogicOverhaulMod extends Mod {
     }
 
     // ------------------------------------------------------------
-    // Input tracking
+    // KEY HELPERS
+    // ------------------------------------------------------------
+
+    // Only use actual keyboard-type codes.
+    // Excludes the special aggregate and unknown entries.
+    public static boolean isKeyboardKey(KeyCode key) {
+
+        return key.type == KeyCode.KeyType.key
+            && key != KeyCode.anyKey
+            && key != KeyCode.unknown;
+    }
+
+    // Converts Arc key names into Logic Overhaul variable names.
+    // Examples: a -> @keyA, shiftLeft -> @keyShiftLeft.
+    public static String keyVariableName(KeyCode key) {
+
+        String name = key.name();
+
+        if (name.length() == 1) {
+            name = name.toUpperCase(Locale.ROOT);
+        } else {
+            name = Character.toUpperCase(name.charAt(0))
+                + name.substring(1);
+        }
+
+        return "@key" + name;
+    }
+
+    // ------------------------------------------------------------
+    // INPUT TRACKING
     // ------------------------------------------------------------
 
     private void updateInputValues() {
 
-        // Convert world coordinates into map tile coordinates.
-        cursorX = (int)Math.floor(
+        // Mindustry's map tile conversion uses nearest-tile rounding.
+        cursorX = Math.round(
             Core.input.mouseWorldX() / Vars.tilesize
         );
 
-        cursorY = (int)Math.floor(
+        cursorY = Math.round(
             Core.input.mouseWorldY() / Vars.tilesize
         );
 
         mouseLeft = Core.input.keyDown(KeyCode.mouseLeft);
         mouseRight = Core.input.keyDown(KeyCode.mouseRight);
+        mouseMiddle = Core.input.keyDown(KeyCode.mouseMiddle);
 
         keyUp = Core.input.keyDown(KeyCode.up);
         keyDown = Core.input.keyDown(KeyCode.down);
@@ -153,22 +194,31 @@ public class LogicOverhaulMod extends Mod {
     }
 
     // ------------------------------------------------------------
-    // Logic variables
+    // LOGIC VARIABLE REGISTRATION
     // ------------------------------------------------------------
 
     private void registerLogicVariables() {
 
         registerVariable("@cursorX");
         registerVariable("@cursorY");
+
         registerVariable("@mouseLeft");
         registerVariable("@mouseRight");
+        registerVariable("@mouseMiddle");
 
-        registerVariable("@keyUp");
-        registerVariable("@keyDown");
-        registerVariable("@keyLeft");
-        registerVariable("@keyRight");
+        registerVariable("@keyAny");
 
-        Log.info("[Logic Overhaul] Input variables registered!");
+        // Register every keyboard key exposed by Arc.
+        for (KeyCode key : KeyCode.all) {
+
+            if (!isKeyboardKey(key)) continue;
+
+            registerVariable(keyVariableName(key));
+        }
+
+        Log.info(
+            "[Logic Overhaul] Mouse and keyboard variables registered!"
+        );
     }
 
     private void registerVariable(String name) {
@@ -178,7 +228,11 @@ public class LogicOverhaulMod extends Mod {
         }
     }
 
-    private void updateMouseLogicVariables() {
+    // ------------------------------------------------------------
+    // LOGIC VARIABLE UPDATES
+    // ------------------------------------------------------------
+
+    private void updateLogicVariables() {
 
         if (Vars.logicVars == null) return;
 
@@ -187,11 +241,36 @@ public class LogicOverhaulMod extends Mod {
 
         setVariable("@mouseLeft", mouseLeft ? 1 : 0);
         setVariable("@mouseRight", mouseRight ? 1 : 0);
+        setVariable("@mouseMiddle", mouseMiddle ? 1 : 0);
 
         setVariable("@keyUp", keyUp ? 1 : 0);
         setVariable("@keyDown", keyDown ? 1 : 0);
         setVariable("@keyLeft", keyLeft ? 1 : 0);
         setVariable("@keyRight", keyRight ? 1 : 0);
+
+        boolean anyKeyboardKeyPressed = false;
+
+        // Update every exposed keyboard variable.
+        for (KeyCode key : KeyCode.all) {
+
+            if (!isKeyboardKey(key)) continue;
+
+            boolean pressed = Core.input.keyDown(key);
+
+            setVariable(
+                keyVariableName(key),
+                pressed ? 1 : 0
+            );
+
+            if (pressed) {
+                anyKeyboardKeyPressed = true;
+            }
+        }
+
+        setVariable(
+            "@keyAny",
+            anyKeyboardKeyPressed ? 1 : 0
+        );
     }
 
     private void setVariable(String name, double value) {
@@ -202,7 +281,7 @@ public class LogicOverhaulMod extends Mod {
     }
 
     // ------------------------------------------------------------
-    // Debug HUD
+    // DEBUG HUD
     // ------------------------------------------------------------
 
     private void createDebugHud() {
@@ -226,11 +305,28 @@ public class LogicOverhaulMod extends Mod {
 
         mouseLeftLabel = addHudLine("Left Click");
         mouseRightLabel = addHudLine("Right Click");
+        mouseMiddleLabel = addHudLine("Middle Click");
 
         keyUpLabel = addHudLine("Arrow Up");
         keyDownLabel = addHudLine("Arrow Down");
         keyLeftLabel = addHudLine("Arrow Left");
         keyRightLabel = addHudLine("Arrow Right");
+
+        hudPanel.add("Keys Held")
+            .left()
+            .top();
+
+        keysHeldLabel = new Label(
+            "None",
+            Styles.defaultLabel
+        );
+
+        keysHeldLabel.setWrap(true);
+
+        hudPanel.add(keysHeldLabel)
+            .width(180f)
+            .right()
+            .row();
 
         hudRoot.add(hudPanel)
             .top()
@@ -244,7 +340,10 @@ public class LogicOverhaulMod extends Mod {
 
         hudPanel.add(title).left();
 
-        Label value = new Label("0", Styles.defaultLabel);
+        Label value = new Label(
+            "FALSE",
+            Styles.defaultLabel
+        );
 
         hudPanel.add(value)
             .right()
@@ -263,15 +362,34 @@ public class LogicOverhaulMod extends Mod {
 
         mouseLeftLabel.setText(mouseLeft ? "TRUE" : "FALSE");
         mouseRightLabel.setText(mouseRight ? "TRUE" : "FALSE");
+        mouseMiddleLabel.setText(mouseMiddle ? "TRUE" : "FALSE");
 
         keyUpLabel.setText(keyUp ? "TRUE" : "FALSE");
         keyDownLabel.setText(keyDown ? "TRUE" : "FALSE");
         keyLeftLabel.setText(keyLeft ? "TRUE" : "FALSE");
         keyRightLabel.setText(keyRight ? "TRUE" : "FALSE");
+
+        StringBuilder held = new StringBuilder();
+
+        for (KeyCode key : KeyCode.all) {
+
+            if (!isKeyboardKey(key)) continue;
+            if (!Core.input.keyDown(key)) continue;
+
+            if (held.length() > 0) {
+                held.append(", ");
+            }
+
+            held.append(key.getName());
+        }
+
+        keysHeldLabel.setText(
+            held.length() == 0 ? "None" : held.toString()
+        );
     }
 
     // ------------------------------------------------------------
-    // Debug HUD keybind
+    // DEBUG HUD KEYBIND
     // ------------------------------------------------------------
 
     private void loadDebugKey() {
@@ -293,31 +411,47 @@ public class LogicOverhaulMod extends Mod {
         BaseDialog dialog =
             new BaseDialog("Debug HUD Keybind");
 
-        dialog.cont.add("Current key: " + debugKey.name())
-            .pad(8f)
-            .row();
+        dialog.cont.add(
+            "Current key: " + debugKey.getName()
+        )
+        .pad(8f)
+        .row();
 
         dialog.cont.add(
             "Press the key you want to use."
-        ).pad(8f).row();
+        )
+        .pad(8f)
+        .row();
 
         dialog.cont.button("Choose Key", () -> {
+
             capturingKeybind = true;
+
             dialog.hide();
+
             Vars.ui.showInfoToast(
-                "Press a key to assign the Debug HUD toggle.",
+                "Press a keyboard key to assign the HUD toggle.",
                 3f
             );
+
         }).size(240f, 50f).row();
 
         dialog.cont.button("Reset to /", () -> {
+
             debugKey = KeyCode.slash;
-            Core.settings.put(DEBUG_KEY_SETTING, "slash");
+
+            Core.settings.put(
+                DEBUG_KEY_SETTING,
+                "slash"
+            );
+
             dialog.hide();
+
             Vars.ui.showInfoToast(
                 "Debug HUD key reset to /",
                 2f
             );
+
         }).size(240f, 50f).row();
 
         dialog.addCloseButton();
@@ -326,10 +460,21 @@ public class LogicOverhaulMod extends Mod {
 
     private void captureDebugKey() {
 
-        for (KeyCode key : KeyCode.values()) {
+        if (Core.input.keyTap(KeyCode.escape)) {
 
-            if (key == KeyCode.unknown) continue;
-            if (key == KeyCode.escape) continue;
+            capturingKeybind = false;
+
+            Vars.ui.showInfoToast(
+                "Keybind change cancelled.",
+                2f
+            );
+
+            return;
+        }
+
+        for (KeyCode key : KeyCode.all) {
+
+            if (!isKeyboardKey(key)) continue;
 
             if (Core.input.keyTap(key)) {
 
@@ -343,7 +488,7 @@ public class LogicOverhaulMod extends Mod {
                 capturingKeybind = false;
 
                 Vars.ui.showInfoToast(
-                    "Debug HUD key set to " + key.name(),
+                    "Debug HUD key set to " + key.getName(),
                     3f
                 );
 
@@ -353,7 +498,7 @@ public class LogicOverhaulMod extends Mod {
     }
 
     // ------------------------------------------------------------
-    // Settings
+    // SETTINGS
     // ------------------------------------------------------------
 
     private void addEditorSettings() {
@@ -368,16 +513,19 @@ public class LogicOverhaulMod extends Mod {
             table.button(
                 "Choose Editor Theme",
                 this::showThemeDialog
-            ).size(320f, 54f)
-             .left()
-             .row();
+            )
+            .size(320f, 54f)
+            .left()
+            .row();
 
-            table.add("Theme selection is saved automatically.")
-                .width(380f)
-                .wrap()
-                .left()
-                .padTop(5f)
-                .row();
+            table.add(
+                "Theme selection is saved automatically."
+            )
+            .width(380f)
+            .wrap()
+            .left()
+            .padTop(5f)
+            .row();
 
             table.add("Debug HUD")
                 .left()
@@ -388,20 +536,25 @@ public class LogicOverhaulMod extends Mod {
             table.button(
                 "Change Debug HUD Key",
                 this::showDebugKeyDialog
-            ).size(320f, 54f)
-             .left()
-             .row();
+            )
+            .size(320f, 54f)
+            .left()
+            .row();
 
             table.add(
-                "Current key: " + debugKey.name()
-            ).left().padTop(5f).row();
+                "Current key: " + debugKey.getName()
+            )
+            .left()
+            .padTop(5f)
+            .row();
 
             table.add(
                 "Press the assigned key to show or hide the HUD."
-            ).width(380f)
-             .wrap()
-             .left()
-             .padTop(5f);
+            )
+            .width(380f)
+            .wrap()
+            .left()
+            .padTop(5f);
         });
     }
 
